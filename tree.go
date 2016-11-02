@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package dkdtree implements a disk-backed kd-tree for datasets too large for
+// memory.
 package dkdtree
 
 import (
