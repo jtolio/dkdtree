@@ -1,3 +1,17 @@
+// Copyright (C) 2016 JT Olds
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package dkdtree
 
 import (
@@ -13,7 +27,7 @@ const (
 	samplingSize = 100
 )
 
-type PointLog struct {
+type PointSet struct {
 	fh               *os.File
 	buf              *bufio.Writer
 	dims, maxDataLen int
@@ -24,13 +38,13 @@ type PointLog struct {
 	path             string
 }
 
-func NewPointLog(path string, dims, maxDataLen int, deleteOnClose bool) (
-	*PointLog, error) {
+func newPointSet(path string, dims, maxDataLen int, deleteOnClose bool) (
+	*PointSet, error) {
 	fh, err := os.Create(path)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
-	return &PointLog{
+	return &PointSet{
 		fh:            fh,
 		buf:           bufio.NewWriter(fh),
 		dims:          dims,
@@ -41,7 +55,11 @@ func NewPointLog(path string, dims, maxDataLen int, deleteOnClose bool) (
 	}, nil
 }
 
-func (pl *PointLog) closeNoDel() error {
+func NewPointSet(path string, dims, maxDataLen int) (*PointSet, error) {
+	return newPointSet(path, dims, maxDataLen, false)
+}
+
+func (pl *PointSet) closeNoDel() error {
 	var errs errors.ErrorGroup
 	if pl.buf != nil {
 		errs.Add(pl.buf.Flush())
@@ -55,7 +73,7 @@ func (pl *PointLog) closeNoDel() error {
 	return errs.Finalize()
 }
 
-func (pl *PointLog) del() error {
+func (pl *PointSet) del() error {
 	if !pl.deleted {
 		pl.deleted = true
 		return os.Remove(pl.path)
@@ -63,7 +81,7 @@ func (pl *PointLog) del() error {
 	return nil
 }
 
-func (pl *PointLog) Close() error {
+func (pl *PointSet) Close() error {
 	var errs errors.ErrorGroup
 	errs.Add(pl.closeNoDel())
 	if pl.deleteOnClose {
@@ -72,16 +90,12 @@ func (pl *PointLog) Close() error {
 	return errs.Finalize()
 }
 
-func (pl *PointLog) Len() int64      { return pl.count }
-func (pl *PointLog) MaxDataLen() int { return pl.maxDataLen }
-func (pl *PointLog) Dims() int       { return pl.dims }
-
-func (pl *PointLog) Add(p Point) error {
+func (pl *PointSet) Add(p Point) error {
 	if len(p.Pos) != pl.dims {
 		return Error.New("point has wrong dimension: %d, expected %d",
 			len(p.Pos), pl.dims)
 	}
-	err := p.Serialize(pl.buf, pl.maxDataLen)
+	err := p.serialize(pl.buf, pl.maxDataLen)
 	if err != nil {
 		return err
 	}
@@ -97,8 +111,8 @@ func (pl *PointLog) Add(p Point) error {
 	return nil
 }
 
-func (pl *PointLog) Split(fs *FS, median Point, dim int, deleteOnClose bool) (
-	left, right *PointLog, err error) {
+func (pl *PointSet) split(fs *baseFS, median Point, dim int,
+	deleteOnClose bool) (left, right *PointSet, err error) {
 	defer pl.Close()
 	err = pl.closeNoDel()
 	if err != nil {
@@ -113,12 +127,12 @@ func (pl *PointLog) Split(fs *FS, median Point, dim int, deleteOnClose bool) (
 
 	fhbuf := bufio.NewReader(fh)
 
-	left, err = NewPointLog(fs.Temp(), pl.dims, pl.maxDataLen, deleteOnClose)
+	left, err = newPointSet(fs.Temp(), pl.dims, pl.maxDataLen, deleteOnClose)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	right, err = NewPointLog(fs.Temp(), pl.dims, pl.maxDataLen, deleteOnClose)
+	right, err = newPointSet(fs.Temp(), pl.dims, pl.maxDataLen, deleteOnClose)
 	if err != nil {
 		left.closeNoDel()
 		left.del()
@@ -134,12 +148,12 @@ func (pl *PointLog) Split(fs *FS, median Point, dim int, deleteOnClose bool) (
 
 	foundMedian := false
 	for i := int64(0); i < pl.count; i++ {
-		p, err := ParsePoint(fhbuf)
+		p, err := parsePoint(fhbuf)
 		if err != nil {
 			closeUp()
 			return nil, nil, err
 		}
-		if !foundMedian && median.Equal(&p) {
+		if !foundMedian && median.equal(&p) {
 			foundMedian = true
 			continue
 		}
@@ -157,26 +171,26 @@ func (pl *PointLog) Split(fs *FS, median Point, dim int, deleteOnClose bool) (
 	return left, right, nil
 }
 
-func (pl *PointLog) MedianEstimate(dim int) Point {
+func (pl *PointSet) medianEstimate(dim int) Point {
 	if len(pl.reservoir) == 0 {
 		panic("no points in reservoir")
 	}
-	ps := PointSorter{
+	ps := pointSorter{
 		Dim:    dim,
 		Points: append([]Point(nil), pl.reservoir...)}
 	sort.Sort(&ps)
 	return ps.Points[len(ps.Points)/2]
 }
 
-type PointSorter struct {
+type pointSorter struct {
 	Dim    int
 	Points []Point
 }
 
-func (p *PointSorter) Len() int { return len(p.Points) }
-func (p *PointSorter) Less(i, j int) bool {
+func (p *pointSorter) Len() int { return len(p.Points) }
+func (p *pointSorter) Less(i, j int) bool {
 	return p.Points[i].Pos[p.Dim] < p.Points[j].Pos[p.Dim]
 }
-func (p *PointSorter) Swap(i, j int) {
+func (p *pointSorter) Swap(i, j int) {
 	p.Points[i], p.Points[j] = p.Points[j], p.Points[i]
 }

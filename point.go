@@ -1,3 +1,17 @@
+// Copyright (C) 2016 JT Olds
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package dkdtree
 
 import (
@@ -25,7 +39,7 @@ type Point struct {
 	Data []byte
 }
 
-func (p1 *Point) Equal(p2 *Point) bool {
+func (p1 *Point) equal(p2 *Point) bool {
 	if len(p1.Pos) != len(p2.Pos) ||
 		len(p1.Data) != len(p2.Data) {
 		return false
@@ -38,7 +52,7 @@ func (p1 *Point) Equal(p2 *Point) bool {
 	return bytes.Equal(p1.Data, p2.Data)
 }
 
-func (p1 *Point) DistanceSquared(p2 *Point) (sum float64) {
+func (p1 *Point) distanceSquared(p2 *Point) (sum float64) {
 	for i, v := range p1.Pos {
 		delta := v - p2.Pos[i]
 		sum += delta * delta
@@ -46,7 +60,7 @@ func (p1 *Point) DistanceSquared(p2 *Point) (sum float64) {
 	return sum
 }
 
-func (p *Point) Serialize(w io.Writer, maxDataLen int) error {
+func (p *Point) serialize(w io.Writer, maxDataLen int) error {
 	if len(p.Data) > maxDataLen {
 		return Error.New("data length (%d) greater than max data length (%d)",
 			len(p.Data), maxDataLen)
@@ -91,7 +105,7 @@ func (p *Point) Serialize(w io.Writer, maxDataLen int) error {
 	return Error.Wrap(err)
 }
 
-func ParsePoint(r io.Reader) (rv Point, err error) {
+func parsePoint(r io.Reader) (rv Point, err error) {
 	var version [1]byte
 	_, err = io.ReadFull(r, version[:])
 	if err != nil {

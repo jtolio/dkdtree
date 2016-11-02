@@ -1,3 +1,17 @@
+// Copyright (C) 2016 JT Olds
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package dkdtree
 
 import (
@@ -26,15 +40,27 @@ func NewPoint(dims, maxData int) (rv Point) {
 
 func AssertPointsEqual(p1, p2 Point) {
 	if len(p1.Pos) != len(p2.Pos) {
+		if p1.equal(&p2) {
+			panic("uh oh, equal is wrong")
+		}
 		panic("not equal")
 	}
 	for i, val := range p1.Pos {
 		if p2.Pos[i] != val {
+			if p1.equal(&p2) {
+				panic("uh oh, equal is wrong")
+			}
 			panic("not equal")
 		}
 	}
 	if string(p1.Data) != string(p2.Data) {
+		if p1.equal(&p2) {
+			panic("uh oh, equal is wrong")
+		}
 		panic("not equal")
+	}
+	if !p1.equal(&p2) {
+		panic("uh oh, equal is wrong")
 	}
 }
 
@@ -45,7 +71,7 @@ func TestPoint(t *testing.T) {
 	var points [pointsToTest]Point
 	for i := range points[:] {
 		points[i] = NewPoint(dims, maxData)
-		err := points[i].Serialize(&buf, maxData)
+		err := points[i].serialize(&buf, maxData)
 		if err != nil {
 			panic(err)
 		}
@@ -53,7 +79,7 @@ func TestPoint(t *testing.T) {
 	var points2 [pointsToTest]Point
 	for i := range points2[:] {
 		var err error
-		points2[i], err = ParsePoint(&buf)
+		points2[i], err = parsePoint(&buf)
 		if err != nil {
 			panic(err)
 		}

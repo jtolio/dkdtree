@@ -1,3 +1,17 @@
+// Copyright (C) 2016 JT Olds
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package dkdtree
 
 import (
@@ -17,14 +31,19 @@ var (
 type Tree struct {
 	path  string
 	fh    *os.File
-	Root  int64
-	Count int64
+	root  int64
+	count int64
 }
 
-func CreateTree(fs *FS, path string, log *PointLog) (*Tree, error) {
-	count := log.Len()
+func CreateTree(path, tmpdir string, log *PointSet) (*Tree, error) {
+	count := log.count
 
-	nlog, err := NewNodeLog(path, log.Dims(), log.MaxDataLen())
+	fs, err := newBaseFS(tmpdir)
+	if err != nil {
+		return nil, err
+	}
+
+	nlog, err := newNodeLog(path, log.dims, log.maxDataLen)
 	if err != nil {
 		return nil, err
 	}
@@ -47,8 +66,8 @@ func CreateTree(fs *FS, path string, log *PointLog) (*Tree, error) {
 	return &Tree{
 		path:  path,
 		fh:    fh,
-		Root:  root_offset,
-		Count: count,
+		root:  root_offset,
+		count: count,
 	}, nil
 }
 
@@ -63,7 +82,7 @@ func OpenTree(path string) (*Tree, error) {
 		return nil, err
 	}
 	if filelen == 0 {
-		return &Tree{path: path, fh: fh, Root: -1, Count: 0}, nil
+		return &Tree{path: path, fh: fh, root: -1, count: 0}, nil
 	}
 
 	_, err = fh.Seek(0, 0)
@@ -72,7 +91,7 @@ func OpenTree(path string) (*Tree, error) {
 		return nil, err
 	}
 
-	_, err = ParseNode(fh)
+	_, err = parseNode(fh)
 	if err != nil {
 		fh.Close()
 		return nil, err
@@ -92,21 +111,25 @@ func OpenTree(path string) (*Tree, error) {
 	return &Tree{
 		path:  path,
 		fh:    fh,
-		Root:  filelen - nodelen,
-		Count: filelen / nodelen,
+		root:  filelen - nodelen,
+		count: filelen / nodelen,
 	}, nil
-}
-
-func (t *Tree) node(offset int64) (Node, error) {
-	_, err := t.fh.Seek(offset, 0)
-	if err != nil {
-		return Node{}, err
-	}
-	return ParseNode(bufio.NewReader(t.fh))
 }
 
 func (t *Tree) Close() error {
 	return t.fh.Close()
+}
+
+func (t *Tree) Count() int64 {
+	return t.count
+}
+
+func (t *Tree) node(offset int64) (node, error) {
+	_, err := t.fh.Seek(offset, 0)
+	if err != nil {
+		return node{}, err
+	}
+	return parseNode(bufio.NewReader(t.fh))
 }
 
 type PointDistance struct {
@@ -139,7 +162,7 @@ func (h *maxHeap) Pop() (i interface{}) {
 
 func (t *Tree) Nearest(p Point, n int) ([]PointDistance, error) {
 	h := make(maxHeap, 0, n)
-	err := t.search(t.Root, p, &h)
+	err := t.search(t.root, p, &h)
 	if err != nil {
 		return nil, err
 	}
@@ -152,30 +175,30 @@ func (t *Tree) search(node_offset int64, p Point, h *maxHeap) error {
 		return nil
 	}
 
-	node, err := t.node(node_offset)
+	n, err := t.node(node_offset)
 	if err != nil {
 		return err
 	}
 
-	c := p.Pos[node.Dim] - node.Point.Pos[node.Dim]
-	dist := p.DistanceSquared(&node.Point)
+	c := p.Pos[n.Dim] - n.Point.Pos[n.Dim]
+	dist := p.distanceSquared(&n.Point)
 
 	if h.Len() < h.Cap() || dist < h.Max().Distance {
 		for h.Len() >= h.Cap() {
 			heap.Pop(h)
 		}
 		heap.Push(h, PointDistance{
-			Point:    node.Point,
+			Point:    n.Point,
 			Distance: dist})
 	}
 
 	if c <= 0 {
-		err = t.search(node.Left, p, h)
+		err = t.search(n.Left, p, h)
 		if err != nil {
 			return err
 		}
 		if c*c <= h.Max().Distance {
-			err = t.search(node.Right, p, h)
+			err = t.search(n.Right, p, h)
 			if err != nil {
 				return err
 			}
@@ -183,12 +206,12 @@ func (t *Tree) search(node_offset int64, p Point, h *maxHeap) error {
 		return nil
 	}
 
-	err = t.search(node.Right, p, h)
+	err = t.search(n.Right, p, h)
 	if err != nil {
 		return err
 	}
 	if c*c <= h.Max().Distance {
-		err = t.search(node.Left, p, h)
+		err = t.search(n.Left, p, h)
 		if err != nil {
 			return err
 		}
