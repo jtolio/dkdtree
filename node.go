@@ -19,13 +19,13 @@ import (
 	"io"
 )
 
-type node struct {
+type Node struct {
 	Point       Point
 	Dim         uint32
 	Left, Right int64
 }
 
-func (n *node) Serialize(w io.Writer, maxDataLen int) error {
+func (n *Node) serialize(w io.Writer, maxDataLen int) error {
 	err := n.Point.serialize(w, maxDataLen)
 	if err != nil {
 		return err
@@ -43,7 +43,7 @@ func (n *node) Serialize(w io.Writer, maxDataLen int) error {
 	return Error.Wrap(binary.Write(w, binary.BigEndian, n.Dim))
 }
 
-func parseNode(r io.Reader) (rv node, err error) {
+func parseNode(r io.Reader) (rv Node, err error) {
 	rv.Point, err = parsePoint(r)
 	if err != nil {
 		return rv, err

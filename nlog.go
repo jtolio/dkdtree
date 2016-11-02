@@ -48,7 +48,7 @@ func (nl *nodeLog) Close() error {
 	return errs.Finalize()
 }
 
-func (nl *nodeLog) Add(n node) (offset int64, err error) {
+func (nl *nodeLog) Add(n Node) (offset int64, err error) {
 	offset = nl.offset
 
 	if len(n.Point.Pos) != nl.dims {
@@ -57,7 +57,7 @@ func (nl *nodeLog) Add(n node) (offset int64, err error) {
 	}
 
 	meter := newWriteMeter(nl.buf)
-	err = n.Serialize(meter, nl.maxDataLen)
+	err = n.serialize(meter, nl.maxDataLen)
 	nl.offset += meter.Amount
 	return offset, err
 }
@@ -90,7 +90,7 @@ func (nl *nodeLog) Build(fs *baseFS, log *PointSet, dim int) (
 		return -1, err
 	}
 
-	return nl.Add(node{
+	return nl.Add(Node{
 		Point: median,
 		Dim:   uint32(dim),
 		Left:  leftOffset,

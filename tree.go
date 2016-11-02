@@ -40,10 +40,11 @@ type Tree struct {
 func CreateTree(path, tmpdir string, points *PointSet) (*Tree, error) {
 	count := points.count
 
-	fs, err := newBaseFS(tmpdir)
+	fs, err := newBaseFS(tempName(tmpdir))
 	if err != nil {
 		return nil, err
 	}
+	defer fs.Delete()
 
 	nlog, err := newNodeLog(path, points.dims, points.maxDataLen)
 	if err != nil {
@@ -122,14 +123,13 @@ func (t *Tree) Close() error {
 	return t.fh.Close()
 }
 
-func (t *Tree) Count() int64 {
-	return t.count
-}
+func (t *Tree) Count() int64        { return t.count }
+func (t *Tree) Root() (Node, error) { return t.Node(t.root) }
 
-func (t *Tree) node(offset int64) (node, error) {
-	_, err := t.fh.Seek(offset, 0)
+func (t *Tree) Node(id int64) (Node, error) {
+	_, err := t.fh.Seek(id, 0)
 	if err != nil {
-		return node{}, err
+		return Node{}, err
 	}
 	return parseNode(bufio.NewReader(t.fh))
 }
@@ -177,7 +177,7 @@ func (t *Tree) search(node_offset int64, p Point, h *maxHeap) error {
 		return nil
 	}
 
-	n, err := t.node(node_offset)
+	n, err := t.Node(node_offset)
 	if err != nil {
 		return err
 	}
