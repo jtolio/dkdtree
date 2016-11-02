@@ -37,20 +37,20 @@ type Tree struct {
 	count int64
 }
 
-func CreateTree(path, tmpdir string, log *PointSet) (*Tree, error) {
-	count := log.count
+func CreateTree(path, tmpdir string, points *PointSet) (*Tree, error) {
+	count := points.count
 
 	fs, err := newBaseFS(tmpdir)
 	if err != nil {
 		return nil, err
 	}
 
-	nlog, err := newNodeLog(path, log.dims, log.maxDataLen)
+	nlog, err := newNodeLog(path, points.dims, points.maxDataLen)
 	if err != nil {
 		return nil, err
 	}
 
-	root_offset, err := nlog.Build(fs, log, 0)
+	root_offset, err := nlog.Build(fs, points, 0)
 	if err != nil {
 		return nil, err
 	}
