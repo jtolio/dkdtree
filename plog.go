@@ -42,7 +42,7 @@ func newPointSet(path string, dims, maxDataLen int, deleteOnClose bool) (
 	*PointSet, error) {
 	fh, err := os.Create(path)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, errClass.Wrap(err)
 	}
 	return &PointSet{
 		fh:            fh,
@@ -92,7 +92,7 @@ func (pl *PointSet) Close() error {
 
 func (pl *PointSet) Add(p Point) error {
 	if len(p.Pos) != pl.dims {
-		return Error.New("point has wrong dimension: %d, expected %d",
+		return errClass.New("point has wrong dimension: %d, expected %d",
 			len(p.Pos), pl.dims)
 	}
 	err := p.serialize(pl.buf, pl.maxDataLen)
@@ -148,7 +148,7 @@ func (pl *PointSet) split(fs *baseFS, median Point, dim int,
 
 	foundMedian := false
 	for i := int64(0); i < pl.count; i++ {
-		p, err := parsePoint(fhbuf)
+		p, _, err := parsePoint(fhbuf)
 		if err != nil {
 			closeUp()
 			return nil, nil, err

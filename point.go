@@ -62,57 +62,57 @@ func (p1 *Point) distanceSquared(p2 *Point) (sum float64) {
 
 func (p *Point) serialize(w io.Writer, maxDataLen int) error {
 	if len(p.Data) > maxDataLen {
-		return Error.New("data length (%d) greater than max data length (%d)",
+		return errClass.New("data length (%d) greater than max data length (%d)",
 			len(p.Data), maxDataLen)
 	}
 	// serialization version
 	_, err := w.Write([]byte{0})
 	if err != nil {
-		return Error.Wrap(err)
+		return errClass.Wrap(err)
 	}
 	// number of floating point values
 	posLen := uint32(len(p.Pos))
 	err = binary.Write(w, binary.BigEndian, posLen)
 	if err != nil {
-		return Error.Wrap(err)
+		return errClass.Wrap(err)
 	}
 	// number of data bytes
 	dataLen := uint32(len(p.Data))
 	err = binary.Write(w, binary.BigEndian, dataLen)
 	if err != nil {
-		return Error.Wrap(err)
+		return errClass.Wrap(err)
 	}
 	// padding
 	paddingLen := uint32(maxDataLen - len(p.Data))
 	err = binary.Write(w, binary.BigEndian, paddingLen)
 	if err != nil {
-		return Error.Wrap(err)
+		return errClass.Wrap(err)
 	}
 	// floating point values
 	for _, val := range p.Pos {
 		err = binary.Write(w, binary.BigEndian, val)
 		if err != nil {
-			return Error.Wrap(err)
+			return errClass.Wrap(err)
 		}
 	}
 	// data
 	_, err = w.Write(p.Data)
 	if err != nil {
-		return Error.Wrap(err)
+		return errClass.Wrap(err)
 	}
 	// padding
 	_, err = w.Write(make([]byte, paddingLen))
-	return Error.Wrap(err)
+	return errClass.Wrap(err)
 }
 
-func parsePoint(r io.Reader) (rv Point, err error) {
+func parsePoint(r io.Reader) (rv Point, maxDataLen int, err error) {
 	var version [1]byte
 	_, err = io.ReadFull(r, version[:])
 	if err != nil {
-		return rv, Error.Wrap(err)
+		return rv, 0, err
 	}
 	if version[0] != 0 {
-		return rv, Error.New("invalid serialization version")
+		return rv, 0, errClass.New("invalid serialization version")
 	}
 
 	// pos, data, padding
@@ -120,7 +120,7 @@ func parsePoint(r io.Reader) (rv Point, err error) {
 	for i := range lens[:] {
 		err = binary.Read(r, binary.BigEndian, &(lens[i]))
 		if err != nil {
-			return rv, Error.Wrap(err)
+			return rv, 0, errClass.Wrap(err)
 		}
 	}
 
@@ -130,15 +130,15 @@ func parsePoint(r io.Reader) (rv Point, err error) {
 	for i := range rv.Pos {
 		err = binary.Read(r, binary.BigEndian, &(rv.Pos[i]))
 		if err != nil {
-			return rv, Error.Wrap(err)
+			return rv, 0, errClass.Wrap(err)
 		}
 	}
 
 	_, err = io.ReadFull(r, rv.Data)
 	if err != nil {
-		return rv, Error.Wrap(err)
+		return rv, 0, errClass.Wrap(err)
 	}
 
 	_, err = io.CopyN(ioutil.Discard, r, int64(lens[2]))
-	return rv, Error.Wrap(err)
+	return rv, int(lens[1] + lens[2]), errClass.Wrap(err)
 }

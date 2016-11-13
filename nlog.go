@@ -31,7 +31,7 @@ type nodeLog struct {
 func newNodeLog(path string, dims, maxDataLen int) (*nodeLog, error) {
 	fh, err := os.Create(path)
 	if err != nil {
-		return nil, Error.Wrap(err)
+		return nil, errClass.Wrap(err)
 	}
 	return &nodeLog{
 		fh:         fh,
@@ -52,7 +52,7 @@ func (nl *nodeLog) Add(n Node) (offset int64, err error) {
 	offset = nl.offset
 
 	if len(n.Point.Pos) != nl.dims {
-		return offset, Error.New("point has wrong dimension: %d, expected %d",
+		return offset, errClass.New("point has wrong dimension: %d, expected %d",
 			len(n.Point.Pos), nl.dims)
 	}
 

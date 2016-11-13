@@ -32,3 +32,14 @@ func (w *writeMeter) Write(p []byte) (n int, err error) {
 	w.Amount += int64(n)
 	return n, err
 }
+
+type wrappedReader struct {
+	r   io.Reader
+	pos int64
+}
+
+func (w *wrappedReader) Read(p []byte) (n int, err error) {
+	n, err = w.r.Read(p)
+	w.pos += int64(n)
+	return n, err
+}

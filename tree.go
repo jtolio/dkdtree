@@ -17,9 +17,9 @@
 package dkdtree
 
 import (
-	"bufio"
+	"bytes"
 	"container/heap"
-	"fmt"
+	"io"
 	"os"
 	"sort"
 
@@ -27,51 +27,47 @@ import (
 )
 
 var (
-	Error = errors.NewClass("dkdtree")
+	errClass = errors.NewClass("dkdtree")
 )
 
 type Tree struct {
-	path  string
-	fh    *os.File
-	root  int64
-	count int64
+	path    string
+	fh      *os.File
+	root    int64
+	count   int64
+	nodelen int64
 }
 
 func CreateTree(path, tmpdir string, points *PointSet) (*Tree, error) {
-	count := points.count
-
 	fs, err := newBaseFS(tempName(tmpdir))
 	if err != nil {
 		return nil, err
 	}
 	defer fs.Delete()
 
-	nlog, err := newNodeLog(path, points.dims, points.maxDataLen)
+	reversed := fs.Temp()
+
+	nlog, err := newNodeLog(reversed, points.dims, points.maxDataLen)
 	if err != nil {
 		return nil, err
 	}
 
-	root_offset, err := nlog.Build(fs, points, 0)
+	_, err = nlog.Build(fs, points, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	nlog.Close()
+	err = nlog.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	fh, err := os.Open(path)
+	err = reverseTree(reversed, path)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Tree{
-		path:  path,
-		fh:    fh,
-		root:  root_offset,
-		count: count,
-	}, nil
+	return OpenTree(path)
 }
 
 func OpenTree(path string) (*Tree, error) {
@@ -79,6 +75,7 @@ func OpenTree(path string) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	filelen, err := fh.Seek(0, 2)
 	if err != nil {
 		fh.Close()
@@ -94,7 +91,7 @@ func OpenTree(path string) (*Tree, error) {
 		return nil, err
 	}
 
-	_, err = parseNode(fh)
+	_, _, err = parseNode(fh)
 	if err != nil {
 		fh.Close()
 		return nil, err
@@ -108,14 +105,15 @@ func OpenTree(path string) (*Tree, error) {
 
 	if filelen%nodelen != 0 {
 		fh.Close()
-		return nil, fmt.Errorf("Invalid tree file")
+		return nil, errClass.New("Invalid tree file")
 	}
 
 	return &Tree{
-		path:  path,
-		fh:    fh,
-		root:  filelen - nodelen,
-		count: filelen / nodelen,
+		path:    path,
+		fh:      fh,
+		root:    0,
+		count:   filelen / nodelen,
+		nodelen: nodelen,
 	}, nil
 }
 
@@ -131,7 +129,13 @@ func (t *Tree) Node(id int64) (Node, error) {
 	if err != nil {
 		return Node{}, err
 	}
-	return parseNode(bufio.NewReader(t.fh))
+	data := make([]byte, t.nodelen)
+	_, err = io.ReadFull(t.fh, data)
+	if err != nil {
+		return Node{}, err
+	}
+	n, _, err := parseNode(bytes.NewReader(data))
+	return n, err
 }
 
 type PointDistance struct {

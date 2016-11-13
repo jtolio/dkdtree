@@ -28,15 +28,15 @@ type baseFS struct {
 func newBaseFS(path string) (*baseFS, error) {
 	err := os.MkdirAll(path, 0777)
 	if err != nil {
-		return nil, Error.New("unable to open %#v: %v", path, err)
+		return nil, errClass.New("unable to open %#v: %v", path, err)
 	}
 	err = os.MkdirAll(filepath.Join(path, "tmp"), 0777)
 	if err != nil {
-		return nil, Error.New("unable to open %#v: %v", path, err)
+		return nil, errClass.New("unable to open %#v: %v", path, err)
 	}
 	err = os.MkdirAll(filepath.Join(path, "named"), 0777)
 	if err != nil {
-		return nil, Error.New("unable to open %#v: %v", path, err)
+		return nil, errClass.New("unable to open %#v: %v", path, err)
 	}
 	return &baseFS{
 		base: path,

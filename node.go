@@ -20,9 +20,9 @@ import (
 )
 
 type Node struct {
-	Point       Point
 	Dim         uint32
 	Left, Right int64
+	Point       Point
 }
 
 func (n *Node) serialize(w io.Writer, maxDataLen int) error {
@@ -33,31 +33,32 @@ func (n *Node) serialize(w io.Writer, maxDataLen int) error {
 
 	err = binary.Write(w, binary.BigEndian, n.Left)
 	if err != nil {
-		return Error.Wrap(err)
+		return errClass.Wrap(err)
 	}
 	err = binary.Write(w, binary.BigEndian, n.Right)
 	if err != nil {
-		return Error.Wrap(err)
+		return errClass.Wrap(err)
 	}
 
-	return Error.Wrap(binary.Write(w, binary.BigEndian, n.Dim))
+	return errClass.Wrap(binary.Write(w, binary.BigEndian, n.Dim))
 }
 
-func parseNode(r io.Reader) (rv Node, err error) {
-	rv.Point, err = parsePoint(r)
+func parseNode(r io.Reader) (rv Node, maxDataLen int, err error) {
+	rv.Point, maxDataLen, err = parsePoint(r)
 	if err != nil {
-		return rv, err
+		return rv, 0, err
 	}
 
 	err = binary.Read(r, binary.BigEndian, &rv.Left)
 	if err != nil {
-		return rv, Error.Wrap(err)
+		return rv, 0, errClass.Wrap(err)
 	}
 
 	err = binary.Read(r, binary.BigEndian, &rv.Right)
 	if err != nil {
-		return rv, Error.Wrap(err)
+		return rv, 0, errClass.Wrap(err)
 	}
 
-	return rv, Error.Wrap(binary.Read(r, binary.BigEndian, &rv.Dim))
+	return rv, maxDataLen, errClass.Wrap(
+		binary.Read(r, binary.BigEndian, &rv.Dim))
 }
