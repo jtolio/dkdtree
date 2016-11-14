@@ -31,16 +31,16 @@ func (n *Node) serialize(w io.Writer, maxDataLen int) error {
 		return err
 	}
 
-	err = binary.Write(w, binary.BigEndian, n.Left)
+	err = binary.Write(w, binary.LittleEndian, n.Left)
 	if err != nil {
 		return errClass.Wrap(err)
 	}
-	err = binary.Write(w, binary.BigEndian, n.Right)
+	err = binary.Write(w, binary.LittleEndian, n.Right)
 	if err != nil {
 		return errClass.Wrap(err)
 	}
 
-	return errClass.Wrap(binary.Write(w, binary.BigEndian, n.Dim))
+	return errClass.Wrap(binary.Write(w, binary.LittleEndian, n.Dim))
 }
 
 func parseNode(r io.Reader) (rv Node, maxDataLen int, err error) {
@@ -49,16 +49,16 @@ func parseNode(r io.Reader) (rv Node, maxDataLen int, err error) {
 		return rv, 0, err
 	}
 
-	err = binary.Read(r, binary.BigEndian, &rv.Left)
+	err = binary.Read(r, binary.LittleEndian, &rv.Left)
 	if err != nil {
 		return rv, 0, errClass.Wrap(err)
 	}
 
-	err = binary.Read(r, binary.BigEndian, &rv.Right)
+	err = binary.Read(r, binary.LittleEndian, &rv.Right)
 	if err != nil {
 		return rv, 0, errClass.Wrap(err)
 	}
 
 	return rv, maxDataLen, errClass.Wrap(
-		binary.Read(r, binary.BigEndian, &rv.Dim))
+		binary.Read(r, binary.LittleEndian, &rv.Dim))
 }
