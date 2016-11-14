@@ -78,11 +78,15 @@ func TestPoint(t *testing.T) {
 	}
 	var points2 [pointsToTest]Point
 	for i := range points2[:] {
-		var err error
-		points2[i], err = parsePoint(&buf)
+		tp, _, err := parsePoint(buf.Bytes())
+		if err != nil {
+			panic(err)
+		}
+		points2[i], _, err = parsePointFromReader(&buf)
 		if err != nil {
 			panic(err)
 		}
 		AssertPointsEqual(points[i], points2[i])
+		AssertPointsEqual(points[i], tp)
 	}
 }

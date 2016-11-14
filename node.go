@@ -43,8 +43,23 @@ func (n *Node) serialize(w io.Writer, maxDataLen int) error {
 	return errClass.Wrap(binary.Write(w, binary.LittleEndian, n.Dim))
 }
 
-func parseNode(r io.Reader) (rv Node, maxDataLen int, err error) {
-	rv.Point, maxDataLen, err = parsePoint(r)
+func parseNode(data []byte) (rv Node, err error) {
+	var remaining []byte
+	rv.Point, remaining, err = parsePoint(data)
+	if err != nil {
+		return rv, err
+	}
+	rv.Left = int64(binary.LittleEndian.Uint64(remaining))
+	remaining = remaining[uint64Size:]
+	rv.Right = int64(binary.LittleEndian.Uint64(remaining))
+	remaining = remaining[uint64Size:]
+	rv.Dim = binary.LittleEndian.Uint32(remaining)
+	remaining = remaining[uint32Size:]
+	return rv, nil
+}
+
+func parseNodeFromReader(r io.Reader) (rv Node, maxDataLen int, err error) {
+	rv.Point, maxDataLen, err = parsePointFromReader(r)
 	if err != nil {
 		return rv, 0, err
 	}

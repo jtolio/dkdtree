@@ -18,20 +18,25 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
-	"io/ioutil"
 )
 
 const (
 	// these assumptions are coded into serialization version 0
 	float64Size = 8
 	uint32Size  = 4
+	uint64Size  = 8
 )
 
 func init() {
 	if float64Size != binary.Size(float64(0)) ||
-		uint32Size != binary.Size(uint32(0)) {
+		uint32Size != binary.Size(uint32(0)) ||
+		uint64Size != binary.Size(uint64(0)) {
 		panic("uh oh")
 	}
+}
+
+func pointSize(dims, maxDataLen int) int {
+	return 1 + uint32Size*3 + dims*float64Size + maxDataLen
 }
 
 type Point struct {
@@ -103,34 +108,58 @@ func (p *Point) serialize(w io.Writer, maxDataLen int) error {
 	return errClass.Wrap(err)
 }
 
-func parsePoint(r io.Reader) (rv Point, maxDataLen int, err error) {
-	var version [1]byte
-	_, err = io.ReadFull(r, version[:])
+func parsePointHeader(buf []byte) (dims, datalen, padlen uint32,
+	remaining []byte, err error) {
+	if buf[0] != 0 {
+		return 0, 0, 0, nil, errClass.New("invalid serialization version")
+	}
+	buf = buf[1:]
+
+	dims = binary.LittleEndian.Uint32(buf)
+	buf = buf[uint32Size:]
+	datalen = binary.LittleEndian.Uint32(buf)
+	buf = buf[uint32Size:]
+	padlen = binary.LittleEndian.Uint32(buf)
+	buf = buf[uint32Size:]
+	return dims, datalen, padlen, buf, nil
+}
+
+func parsePoint(buf []byte) (rv Point, remaining []byte, err error) {
+	dims, datalen, padlen, body, err := parsePointHeader(buf)
+	if err != nil {
+		return rv, nil, err
+	}
+
+	posBytes := dims * float64Size
+
+	rv.Pos, err = readFloats(body[:posBytes])
+	if err != nil {
+		return rv, nil, errClass.Wrap(err)
+	}
+	body = body[posBytes:]
+
+	rv.Data = body[:datalen]
+
+	return rv, body[datalen+padlen:], nil
+}
+
+func parsePointFromReader(r io.Reader) (rv Point, maxDataLen int, err error) {
+	var header [1 + 3*uint32Size]byte
+	_, err = io.ReadFull(r, header[:])
 	if err != nil {
 		return rv, 0, err
 	}
-	if version[0] != 0 {
-		return rv, 0, errClass.New("invalid serialization version")
-	}
-
-	// pos, data, padding
-	var lens [3]uint32
-	err = binary.Read(r, binary.LittleEndian, lens[:])
+	dims, datalen, padlen, _, err := parsePointHeader(header[:])
 	if err != nil {
-		return rv, 0, errClass.Wrap(err)
+		return rv, 0, err
 	}
 
-	rv.Pos, err = readFloats(r, lens[0])
+	data := make([]byte, len(header)+int(dims)*float64Size+int(datalen+padlen))
+	copy(data, header[:])
+	_, err = io.ReadFull(r, data[len(header):])
 	if err != nil {
-		return rv, 0, errClass.Wrap(err)
+		return rv, 0, err
 	}
-	rv.Data = make([]byte, lens[1])
-
-	_, err = io.ReadFull(r, rv.Data)
-	if err != nil {
-		return rv, 0, errClass.Wrap(err)
-	}
-
-	_, err = io.CopyN(ioutil.Discard, r, int64(lens[2]))
-	return rv, int(lens[1] + lens[2]), errClass.Wrap(err)
+	rv, _, err = parsePoint(data)
+	return rv, int(datalen + padlen), err
 }

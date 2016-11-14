@@ -16,6 +16,7 @@ package dkdtree
 
 import (
 	"bufio"
+	"io"
 	"math/rand"
 	"os"
 	"sort"
@@ -148,7 +149,13 @@ func (pl *PointSet) split(fs *baseFS, median Point, dim int,
 
 	foundMedian := false
 	for i := int64(0); i < pl.count; i++ {
-		p, _, err := parsePoint(fhbuf)
+		data := make([]byte, pointSize(pl.dims, pl.maxDataLen))
+		_, err = io.ReadFull(fhbuf, data)
+		if err != nil {
+			closeUp()
+			return nil, nil, err
+		}
+		p, _, err := parsePoint(data)
 		if err != nil {
 			closeUp()
 			return nil, nil, err

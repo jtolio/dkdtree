@@ -21,7 +21,7 @@ import (
 	"io"
 )
 
-func readFloats(r io.Reader, amount uint32) ([]float64, error) {
-	rv := make([]float64, amount)
-	return rv, binary.Read(r, binary.LittleEndian, rv)
+func readFloats(data []byte) ([]float64, error) {
+	rv := make([]float64, len(data)/float64Size)
+	return rv, binary.Read(bytes.NewReader(data), binary.LittleEndian, rv)
 }

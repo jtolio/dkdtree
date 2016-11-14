@@ -15,22 +15,13 @@
 package dkdtree
 
 import (
-	"io"
 	"reflect"
 	"unsafe"
 )
 
-func readFloats(r io.Reader, amount uint32) ([]float64, error) {
-	data := make([]byte, amount*float64Size)
-	_, err := io.ReadFull(r, data)
-	if err != nil {
-		return nil, err
-	}
-
+func readFloats(data []byte) ([]float64, error) {
 	header := *(*reflect.SliceHeader)(unsafe.Pointer(&data))
-
 	header.Len /= float64Size
 	header.Cap /= float64Size
-
 	return *(*[]float64)(unsafe.Pointer(&header)), nil
 }

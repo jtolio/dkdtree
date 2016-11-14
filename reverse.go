@@ -55,7 +55,7 @@ func reverseTree(oldpath, newpath string) error {
 	nodelen := int64(-1)
 	maxDataLen := -1
 	for node_idx := int64(0); true; node_idx++ {
-		node, nodeMaxDataLen, err := parseNode(source)
+		node, nodeMaxDataLen, err := parseNodeFromReader(source)
 		if err != nil {
 			if err == io.EOF {
 				break

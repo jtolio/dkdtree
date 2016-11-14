@@ -17,7 +17,6 @@
 package dkdtree
 
 import (
-	"bytes"
 	"container/heap"
 	"io"
 	"os"
@@ -91,7 +90,7 @@ func OpenTree(path string) (*Tree, error) {
 		return nil, err
 	}
 
-	_, _, err = parseNode(fh)
+	_, _, err = parseNodeFromReader(fh)
 	if err != nil {
 		fh.Close()
 		return nil, err
@@ -134,8 +133,7 @@ func (t *Tree) Node(id int64) (Node, error) {
 	if err != nil {
 		return Node{}, err
 	}
-	n, _, err := parseNode(bytes.NewReader(data))
-	return n, err
+	return parseNode(data)
 }
 
 type PointDistance struct {
