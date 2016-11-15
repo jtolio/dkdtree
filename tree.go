@@ -17,6 +17,7 @@
 package dkdtree
 
 import (
+	"bufio"
 	"container/heap"
 	"io"
 	"os"
@@ -162,6 +163,37 @@ func (h *maxHeap) Push(x interface{}) {
 func (h *maxHeap) Pop() (i interface{}) {
 	i, *h = (*h)[len(*h)-1], (*h)[:len(*h)-1]
 	return i
+}
+
+// NearestExhaustive just scans every point. This might be faster if your data
+// has high dimensionality.
+func (t *Tree) NearestExhaustive(p Point, n int) ([]PointDistance, error) {
+	h := make(maxHeap, 0, n)
+	_, err := t.fh.Seek(0, 0)
+	if err != nil {
+		return nil, err
+	}
+	buf := bufio.NewReader(t.fh)
+	for {
+		n, _, err := parseNodeFromReader(buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		dist := p.distanceSquared(&n.Point)
+		if h.Len() < h.Cap() || dist < h.Max().Distance {
+			for h.Len() >= h.Cap() {
+				heap.Pop(&h)
+			}
+			heap.Push(&h, PointDistance{
+				Point:    n.Point,
+				Distance: dist})
+		}
+	}
+	sort.Sort(sort.Reverse(&h))
+	return h, nil
 }
 
 func (t *Tree) Nearest(p Point, n int) ([]PointDistance, error) {
